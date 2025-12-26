@@ -28,9 +28,21 @@ macro_rules! do_trait_impl {
     }    
 }
 
-trait Dynable {}
+trait Dynable: Trait {}
 struct Inner;
+do_trait_impl!(Inner, "self_ty Inner");
 impl Dynable for Inner {}
+
+fn assert_arms(range: std::ops::RangeInclusive<usize>, f: impl Fn(usize) -> Vec<&'static str>, arm_coercions: &[&[&'static str]]) {
+    let mut coercions = vec![];
+    for i in range {
+        let c = f(i);
+        coercions.push(c);
+    }
+    for (i, (arm_coercion, coercion)) in std::iter::zip(arm_coercions.iter(), coercions.into_iter()).enumerate() {
+        assert_eq!(arm_coercion, &coercion, "Arm {i} didn't match expectation:\n expected {:?}\n got {:?}", arm_coercion, coercion);
+    }
+}
 
 struct Wrap<T: ?Sized>(T);
 
@@ -91,70 +103,89 @@ impl Deref for TopTypeNoTrait {
 }
 
 fn simple() {
-    let x = match 0 {
-        0 => &Wrap([]) as &ArrayWrapper,
-        _ => &Wrap([]) as &UnsizedArray,
-    };
-    assert_eq!(x.complete(), vec!["self_ty UnsizedArray"]);
+    assert_arms(
+        0..=1,
+        |i| match i {
+            0 => &Wrap([]) as &ArrayWrapper,
+            1 => &Wrap([]) as &UnsizedArray,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty UnsizedArray"],
+            &["self_ty UnsizedArray"],
+        ],
+    );
 }
 
 fn long_chain() {
-    let a = match 0 {
-        0 => &TopType      as &TopType,
-        1 => &Wrap([])     as &ArrayWrapper,
-        2 => &IntWrapper   as &IntWrapper,
-        3 => &Wrap([])     as &UnsizedArray,
-        4 => &FinalType    as &FinalType,
-        _ => loop {},
-    };
-    assert_eq!(
-        a.complete(),
-        vec![
-            "deref TopType->ArrayWrapper",
-            "deref ArrayWrapper->IntWrapper",
-            "deref IntWrapper->UnsizedArray",
-            "deref UnsizedArray->FinalType",
-            "self_ty FinalType",
+    assert_arms(
+        0..=4,
+        |i| match i {
+            0 => &TopType        as &TopType,
+            1 => &Wrap([])       as &ArrayWrapper,
+            2 => &IntWrapper     as &IntWrapper,
+            3 => &Wrap([])       as &UnsizedArray,
+            4 => &FinalType      as &FinalType,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["deref TopType->ArrayWrapper", "deref ArrayWrapper->IntWrapper", "deref IntWrapper->UnsizedArray", "deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["deref ArrayWrapper->IntWrapper", "deref IntWrapper->UnsizedArray", "deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["deref IntWrapper->UnsizedArray", "deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["self_ty FinalType"],
         ],
     );
 
-    let b = match 0 {
-        0 => &TopType      as &TopType,
-        1 => &Wrap([])     as &ArrayWrapper,
-        // IntWrapper arm removed
-        2 => &Wrap([])     as &UnsizedArray,
-        3 => &FinalType    as &FinalType,
-        _ => loop {},
-    };
-    assert_eq!(
-        b.complete(),
-        vec![
-            "deref TopType->ArrayWrapper",
-            "deref ArrayWrapper->IntWrapper",
-            "deref IntWrapper->UnsizedArray",
-            "deref UnsizedArray->FinalType",
-            "self_ty FinalType",
+    assert_arms(
+        0..=3,
+        |i| match i {
+            0 => &TopType        as &TopType,
+            1 => &Wrap([])       as &ArrayWrapper,
+            // IntWrapper arm removed
+            2 => &Wrap([])       as &UnsizedArray,
+            3 => &FinalType      as &FinalType,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["deref TopType->ArrayWrapper", "deref ArrayWrapper->IntWrapper", "deref IntWrapper->UnsizedArray", "deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["deref ArrayWrapper->IntWrapper", "deref IntWrapper->UnsizedArray", "deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["deref UnsizedArray->FinalType", "self_ty FinalType"],
+            &["self_ty FinalType"],
         ],
     );
 }
 
 fn order_dependence() {
-    let a = match 0 {
-        0 => &Wrap([])   as &ArrayWrapper,
-        1 => &IntWrapper as &IntWrapper,
-        2 => &Wrap([])   as &UnsizedArray,
-        _ => loop {},
-    };
-    assert_eq!(a.complete(), vec!["self_ty UnsizedArray"]);
+    assert_arms(
+        0..=2,
+        |i| match i {
+            0 => &Wrap([])   as &ArrayWrapper,
+            1 => &IntWrapper as &IntWrapper,
+            2 => &Wrap([])   as &UnsizedArray,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty UnsizedArray"],
+            &["deref IntWrapper->UnsizedArray", "self_ty UnsizedArray"],
+            &["self_ty UnsizedArray"],
+        ],
+    );
 
-    unsafe { ACTIONS.clear() }
-    let b = match 0 {
-        0 => &Wrap([])   as &ArrayWrapper,
-        1 => &Wrap([])   as &UnsizedArray,
-        2 => &IntWrapper as &IntWrapper,
-        _ => loop {},
-    };
-    assert_eq!(b.complete(), vec!["self_ty UnsizedArray"]);
+    assert_arms(
+        0..=2,
+        |i| match i {
+            0 => &Wrap([]) as &ArrayWrapper,
+            1 => &Wrap([]) as &UnsizedArray,
+            2 => &IntWrapper as &IntWrapper,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty UnsizedArray"],
+            &["self_ty UnsizedArray"],
+            &["deref IntWrapper->UnsizedArray", "self_ty UnsizedArray"],
+        ],
+    );
 }
 
 

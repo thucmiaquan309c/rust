@@ -1,16 +1,16 @@
 error[E0277]: the trait bound `TopTypeNoTrait: Dynable` is not satisfied
-  --> $DIR/multistep-fail.rs:131:14
+  --> $DIR/multistep-fail.rs:148:14
    |
 LL |         2 => &TopTypeNoTrait as &FinalType as &dyn Dynable,
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
    |
 help: the trait `Dynable` is not implemented for `TopTypeNoTrait`
-  --> $DIR/multistep-fail.rs:44:1
+  --> $DIR/multistep-fail.rs:56:1
    |
 LL | struct TopTypeNoTrait;
    | ^^^^^^^^^^^^^^^^^^^^^
 help: the following other types implement trait `Dynable`
-  --> $DIR/multistep-fail.rs:34:1
+  --> $DIR/multistep-fail.rs:35:1
    |
 LL | impl Dynable for Inner {}
    | ^^^^^^^^^^^^^^^^^^^^^^ `Inner`
@@ -20,18 +20,18 @@ LL | impl Dynable for FinalType {}
    = note: required for the cast from `&TopTypeNoTrait` to `&dyn Dynable`
 
 error[E0277]: the trait bound `TopTypeNoTrait: Dynable` is not satisfied
-  --> $DIR/multistep-fail.rs:139:14
+  --> $DIR/multistep-fail.rs:156:14
    |
 LL |         1 => &TopTypeNoTrait as &FinalType as &dyn Dynable,
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
    |
 help: the trait `Dynable` is not implemented for `TopTypeNoTrait`
-  --> $DIR/multistep-fail.rs:44:1
+  --> $DIR/multistep-fail.rs:56:1
    |
 LL | struct TopTypeNoTrait;
    | ^^^^^^^^^^^^^^^^^^^^^
 help: the following other types implement trait `Dynable`
-  --> $DIR/multistep-fail.rs:34:1
+  --> $DIR/multistep-fail.rs:35:1
    |
 LL | impl Dynable for Inner {}
    | ^^^^^^^^^^^^^^^^^^^^^^ `Inner`
@@ -41,10 +41,10 @@ LL | impl Dynable for FinalType {}
    = note: required for the cast from `&TopTypeNoTrait` to `&dyn Dynable`
 
 error[E0308]: `match` arms have incompatible types
-  --> $DIR/multistep-fail.rs:152:14
+  --> $DIR/multistep-fail.rs:165:14
    |
-LL |       let a = match 0 {
-   |  _____________-
+LL |       let _a = match 0 {
+   |  ______________-
 LL | |         0 => &A          as &A,
    | |              ----------------- this is found to be of type `&B`
 LL | |         1 => &B          as &B,

@@ -28,9 +28,21 @@ macro_rules! do_trait_impl {
     }    
 }
 
-trait Dynable {}
+trait Dynable: Trait {}
 struct Inner;
+do_trait_impl!(Inner, "self_ty Inner");
 impl Dynable for Inner {}
+
+fn assert_arms(range: std::ops::RangeInclusive<usize>, f: impl Fn(usize) -> Vec<&'static str>, arm_coercions: &[&[&'static str]]) {
+    let mut coercions = vec![];
+    for i in range {
+        let c = f(i);
+        coercions.push(c);
+    }
+    for (i, (arm_coercion, coercion)) in std::iter::zip(arm_coercions.iter(), coercions.into_iter()).enumerate() {
+        assert_eq!(arm_coercion, &coercion, "Arm {i} didn't match expectation:\n expected {:?}\n got {:?}", arm_coercion, coercion);
+    }
+}
 
 struct Wrap4<T: ?Sized>(T);
 
@@ -54,13 +66,20 @@ fn order_lub() {
         _ => loop {},
     };
     assert_eq!(a.complete(), vec!["self_ty N"]);
-    let a = match 0 {
-        0 => &Wrap4(Inner)      as &L,
-        2 => &Wrap4(Inner)      as &N,
-        1 => &Wrap4(Inner)      as &M,
-        _ => loop {},
-    };
-    assert_eq!(a.complete(), vec!["self_ty N"]);
+    assert_arms(
+        0..=2,
+        |i| match i {
+            0 => &Wrap4(Inner)      as &L,
+            2 => &Wrap4(Inner)      as &N,
+            1 => &Wrap4(Inner)      as &M,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty N"],
+            &["self_ty N"],
+            &["self_ty N"],
+        ],
+    );
 }
 
 fn main() {

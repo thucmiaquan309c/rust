@@ -29,9 +29,21 @@ macro_rules! do_trait_impl {
     }    
 }
 
-trait Dynable {}
+trait Dynable: Trait {}
 struct Inner;
+do_trait_impl!(Inner, "self_ty Inner");
 impl Dynable for Inner {}
+
+fn assert_arms(range: std::ops::RangeInclusive<usize>, f: impl Fn(usize) -> Vec<&'static str>, arm_coercions: &[&[&'static str]]) {
+    let mut coercions = vec![];
+    for i in range {
+        let c = f(i);
+        coercions.push(c);
+    }
+    for (i, (arm_coercion, coercion)) in std::iter::zip(arm_coercions.iter(), coercions.into_iter()).enumerate() {
+        assert_eq!(arm_coercion, &coercion, "Arm {i} didn't match expectation:\n expected {:?}\n got {:?}", arm_coercion, coercion);
+    }
+}
 
 struct Wrap3<T: ?Sized>(T);
 
@@ -55,20 +67,34 @@ impl Deref for K {
 }
 
 fn order_lub() {
-    let a = match 0 {
-        0 => &Wrap3(Inner)      as &I,
-        1 => &Wrap3(Inner)      as &J,
-        2 => &Wrap3(Inner)      as &K,
-        _ => loop {},
-    };
-    assert_eq!(a.complete(), vec!["self_ty J"]);
-    let a = match 0 {
-        0 => &Wrap3(Inner)      as &I,
-        2 => &Wrap3(Inner)      as &K,
-        1 => &Wrap3(Inner)      as &J,
-        _ => loop {},
-    };
-    assert_eq!(a.complete(), vec!["self_ty K"]);
+assert_arms(
+    0..=2,
+        |i| match i {
+            0 => &Wrap3(Inner)      as &I,
+            1 => &Wrap3(Inner)      as &J,
+            2 => &Wrap3(Inner)      as &K,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty J"],
+            &["self_ty J"],
+            &["deref K->J", "self_ty J"],
+        ],
+    );
+    assert_arms(
+        0..=2,
+        |i| match i {
+            0 => &Wrap3(Inner)      as &I,
+            1 => &Wrap3(Inner)      as &K,
+            2 => &Wrap3(Inner)      as &J,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty K"],
+            &["self_ty K"],
+            &["self_ty K"],
+        ],
+    );
 }
 
 fn main() {

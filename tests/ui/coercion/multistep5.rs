@@ -1,5 +1,5 @@
 //@ check-fail
-//@ known-bug: #00000
+//@ known-bug: #148283
 
 #![feature(unsize, coerce_unsized)]
 #![allow(static_mut_refs)]
@@ -29,9 +29,21 @@ macro_rules! do_trait_impl {
     }    
 }
 
-trait Dynable {}
+trait Dynable: Trait {}
 struct Inner;
+do_trait_impl!(Inner, "self_ty Inner");
 impl Dynable for Inner {}
+
+fn assert_arms(range: std::ops::RangeInclusive<usize>, f: impl Fn(usize) -> Vec<&'static str>, arm_coercions: &[&[&'static str]]) {
+    let mut coercions = vec![];
+    for i in range {
+        let c = f(i);
+        coercions.push(c);
+    }
+    for (i, (arm_coercion, coercion)) in std::iter::zip(arm_coercions.iter(), coercions.into_iter()).enumerate() {
+        assert_eq!(arm_coercion, &coercion, "Arm {i} didn't match expectation:\n expected {:?}\n got {:?}", arm_coercion, coercion);
+    }
+}
 
 struct Wrap4<T: ?Sized>(T);
 
@@ -66,13 +78,12 @@ impl Deref for Q {
 }
 
 fn order_lub() {
-    let a = match 0 {
+    let _a = match 0 {
         0 => &O      as &O,
         1 => &P      as &P,
         2 => &Q      as &Q,
         _ => loop {},
     };
-    assert_eq!(a.complete(), vec!["self_ty P"]);
 }
 
 fn main() {

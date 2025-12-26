@@ -29,9 +29,21 @@ macro_rules! do_trait_impl {
     }    
 }
 
-trait Dynable {}
+trait Dynable: Trait {}
 struct Inner;
+do_trait_impl!(Inner, "self_ty Inner");
 impl Dynable for Inner {}
+
+fn assert_arms(range: std::ops::RangeInclusive<usize>, f: impl Fn(usize) -> Vec<&'static str>, arm_coercions: &[&[&'static str]]) {
+    let mut coercions = vec![];
+    for i in range {
+        let c = f(i);
+        coercions.push(c);
+    }
+    for (i, (arm_coercion, coercion)) in std::iter::zip(arm_coercions.iter(), coercions.into_iter()).enumerate() {
+        assert_eq!(arm_coercion, &coercion, "Arm {i} didn't match expectation:\n expected {:?}\n got {:?}", arm_coercion, coercion);
+    }
+}
 
 struct Wrap<T: ?Sized>(T);
 
@@ -124,8 +136,13 @@ impl Deref for C {
     }
 }
 
+fn direct_to_dyn() {
+    let _x = &TopTypeNoTrait as &FinalType as &dyn Dynable;
+}
+
+
 fn deref_to_dyn() {
-    let x = match 0 {
+    let _x = match 0 {
         0 => &TopTypeNoTrait as &TopTypeNoTrait,
         1 => &TopTypeNoTrait as &FinalType,
         2 => &TopTypeNoTrait as &FinalType as &dyn Dynable,
@@ -134,38 +151,41 @@ fn deref_to_dyn() {
 }
 
 fn deref_to_dyn_direct() {
-    let x = match 0 {
+    let _x = match 0 {
         0 => &TopTypeNoTrait as &TopTypeNoTrait,
         1 => &TopTypeNoTrait as &FinalType as &dyn Dynable,
         _ => loop {},
     };
 }
 
-fn direct_to_dyn() {
-    let x = &TopTypeNoTrait as &FinalType as &dyn Dynable;
-}
-
 fn skipped_coerce() {
-    let a = match 0 {
+    let _a = match 0 {
         0 => &A          as &A,
         1 => &B          as &B,
         2 => &C          as &C,
         3 => &D          as &D,
         _ => loop {},
     };
-    assert_eq!(a.complete(), vec!["self_ty UnsizedArray"]);
-    let b = match 0 {
-        3 => &D          as &D,
-        0 => &A          as &A,
-        1 => &B          as &B,
-        2 => &C          as &C,
-        _ => loop {},
-    };
-    assert_eq!(b.complete(), vec!["self_ty UnsizedArray"]);
+    assert_arms(
+        0..=3,
+        |i| match i {
+            0 => &D          as &D,
+            1 => &A          as &A,
+            2 => &B          as &B,
+            3 => &C          as &C,
+            _ => loop {},
+        }.complete(),
+        &[
+            &["self_ty D"],
+            &["deref A->B", "deref B->D", "self_ty D"],
+            &["deref B->D", "self_ty D"],
+            &["deref C->D", "self_ty D"],
+        ],
+    );
 }
 fn main() {
+    direct_to_dyn();
     deref_to_dyn();
     deref_to_dyn_direct();
-    direct_to_dyn();
     skipped_coerce();
 }

@@ -1,5 +1,5 @@
 error[E0308]: `match` arms have incompatible types
-  --> $DIR/multistep2.rs:82:14
+  --> $DIR/multistep2.rs:94:14
    |
 LL |       let b = match 0 {
    |  _____________-
